@@ -1,0 +1,90 @@
+
+#include <iostream>
+#include <cstdio>
+#include <cstring>
+#include <gtkmm.h>
+
+#include "cpu.h"
+#include "ppu.h"
+#include "memory.h"
+#include "cartridge.h"
+#include "apu.h"
+#include "input.h"
+#include "snes.h"
+
+using namespace std;
+
+class GUI : public Gtk::Window {
+public:
+    GUI() {
+        set_title("Snes9x");
+        set_default_size(400, 300);
+        set_border_width(10);
+
+        Gtk::Box *vbox = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 10));
+        add(*vbox);
+
+        Gtk::MenuBar *menubar = Gtk::manage(new Gtk::MenuBar());
+        vbox->pack_start(*menubar, Gtk::PACK_SHRINK, 0);
+        Gtk::MenuItem *menuitem_file = Gtk::manage(new Gtk::MenuItem("_File", true));
+        menubar->append(*menuitem_file);
+        Gtk::Menu *filemenu = Gtk::manage(new Gtk::Menu());
+        menuitem_file->set_submenu(*filemenu);
+        Gtk::MenuItem *menuitem_quit = Gtk::manage(new Gtk::MenuItem("_Quit", true));
+        menuitem_quit->signal_activate().connect(sigc::mem_fun(*this, &GUI::on_button_quit));
+        filemenu->append(*menuitem_quit);
+
+        Gtk::Box *hbox = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 10));
+        vbox->pack_start(*hbox, Gtk::PACK_SHRINK, 0);
+        Gtk::Button *button_quit = Gtk::manage(new Gtk::Button("Quit"));
+        button_quit->signal_clicked().connect(sigc::mem_fun(*this, &GUI::on_button_quit));
+        hbox->pack_start(*button_quit, Gtk::PACK_SHRINK, 0);
+
+        vbox->show_all();
+    }
+
+    virtual ~GUI() { }
+
+protected:
+    void on_button_quit() {
+        hide();
+    }
+};
+
+int main(int argc, char* argv[]) {
+    if(argc < 2) {
+        printf("Usage: ./snes9x <rom file>\n");
+        return 0;
+    }
+
+    // Load ROM file
+    FILE* rom = fopen(argv[1], "rb");
+    if(!rom) {
+        printf("Error opening %s\n", argv[1]);
+        return 1;
+    }
+
+    // Initialize emulator
+    SNES snes;
+    snes.init();
+
+    // Load cartridge
+    snes.cartridge.load(rom);
+
+    // Reset emulator
+    // Initialize GUI
+    Gtk::Main kit(argc, argv);
+    GUI gui;
+    Gtk::Main::run(gui);
+
+    snes.cpu.reset();
+
+    // Main emulation loop
+    while(1) {
+        snes.cpu.execute();
+        snes.ppu.execute();
+        snes.apu.execute();
+    }
+
+    return 0;
+}
